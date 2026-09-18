@@ -1,0 +1,68 @@
+package middleware
+
+import (
+	"net/http"
+	"strings"
+
+	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
+)
+
+func Auth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		// Get Authorization header
+		authHeader := c.GetHeader("Authorization")
+
+		if authHeader == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"status":     "401",
+				"message":    "authorization header is required",
+				"message_th": "กรุณาระบุ Authorization Token",
+			})
+			c.Abort()
+			return
+		}
+
+		// Check Bearer token
+		parts := strings.Split(authHeader, " ")
+
+		if len(parts) != 2 || parts[0] != "Bearer" {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"status":     "401",
+				"message":    "invalid authorization format",
+				"message_th": "รูปแบบ Authorization ไม่ถูกต้อง",
+			})
+			c.Abort()
+			return
+		}
+
+		tokenString := parts[1]
+
+		// Parse JWT
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+
+			// Check signing method
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, jwt.ErrTokenSignatureInvalid
+			}
+
+			return jwtSecret, nil
+		})
+
+		if err != nil || !token.Valid {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"status":     "401",
+				"message":    "invalid or expired token",
+				"message_th": "Token ไม่ถูกต้องหรือหมดอายุ",
+			})
+			c.Abort()
+			return
+		}
+
+		// Token is valid
+		c.Set("token", token)
+
+		c.Next()
+	}
+}
