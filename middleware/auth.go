@@ -47,7 +47,7 @@ func Auth() gin.HandlerFunc {
 				return nil, jwt.ErrTokenSignatureInvalid
 			}
 
-			return jwtSecret, nil
+			return signingKey(), nil
 		})
 
 		if err != nil || !token.Valid {

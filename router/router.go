@@ -11,6 +11,7 @@ func SetRouter(app *gin.Engine) {
 	app.POST("/staff/login", handler.Login)
 	protected := app.Group("/")
 	protected.Use(middleware.Auth())
+	protected.POST("/patient/create", handler.CreatePatient)
 	protected.GET("/patient/search", handler.SearchPatient)
 
 	// Backward-compatible versioned routes.
@@ -19,4 +20,5 @@ func SetRouter(app *gin.Engine) {
 	v1.POST("/register/staff", handler.CreateStaff)
 	v1.POST("/auth/login", handler.Login)
 	v1.GET("/patient/search", middleware.Auth(), handler.SearchPatient)
+	v1.POST("/patient/create", middleware.Auth(), handler.CreatePatient)
 }

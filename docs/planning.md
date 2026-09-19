@@ -33,6 +33,12 @@ docker-compose.yml       API, Nginx และ PostgreSQL services
 `date_of_birth` (YYYY-MM-DD), `phone_number`, `email`. เงื่อนไขหลายตัวใช้ AND
 ร่วมกัน และระบบใช้ `hospital_id` จาก JWT ใน query เสมอ จึงค้นข้ามโรงพยาบาลไม่ได้
 
+### เพิ่มผู้ป่วย
+
+`POST /patient/create` ต้องมี Bearer JWT และรับข้อมูล Hospital A เช่น `patient_hn`,
+ข้อมูลชื่อ, `national_id`/`passport_id`, `date_of_birth` (YYYY-MM-DD), ช่องทางติดต่อ
+และ `gender` (`M`/`F`). ระบบใช้โรงพยาบาลจาก JWT ไม่รับ `hospital_id` จาก request body
+
 ## 3. ER Diagram
 
 ```mermaid

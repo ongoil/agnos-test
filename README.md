@@ -15,6 +15,7 @@ Nginx เปิดที่ `http://localhost` และส่งต่อไป
 
 - `POST /staff/create` สร้าง staff โดยรับ `username`, `password`, `hospital` หรือ `hospital_id`
 - `POST /staff/login` login โดยรับ `username`, `password`, `hospital` หรือ `hospital_id`
+- `POST /patient/create` ต้อง login และใช้เพิ่มข้อมูลผู้ป่วยในโรงพยาบาลของ staff
 - `GET /patient/search` ต้องมี `Authorization: Bearer <token>` และรับ query parameters ที่เป็น optional:
   `national_id`, `passport_id`, `first_name`, `middle_name`, `last_name`, `date_of_birth`, `phone_number`, `email`
 

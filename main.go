@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	"github.com/ongoil/agnos-test/db"
@@ -25,9 +26,13 @@ func main() {
 	app := gin.Default()
 	router.SetRouter(app)
 
-	log.Println("server running on :5000")
+	port := os.Getenv("APP_PORT")
+	if port == "" {
+		port = "5000"
+	}
+	log.Println("server running on :" + port)
 
-	if err := app.Run(":5000"); err != nil {
+	if err := app.Run(":" + port); err != nil {
 		log.Fatal("failed to start server:", err)
 	}
 }
