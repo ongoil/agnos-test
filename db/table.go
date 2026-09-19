@@ -5,11 +5,6 @@ import (
 	"gorm.io/gorm"
 )
 
-func DataBaseMigration(DBConn *gorm.DB) error {
-	DBConn.AutoMigrate(
-		models.Hospital{},
-		models.Patient{},
-		models.Staff{},
-	)
-	return nil
+func DataBaseMigration(dbConn *gorm.DB) error {
+	return dbConn.AutoMigrate(models.Hospital{}, models.Patient{}, models.Staff{})
 }

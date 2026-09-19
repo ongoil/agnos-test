@@ -1,106 +1,63 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/sirupsen/logrus"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm"
 
 	"github.com/ongoil/agnos-test/db"
-	"github.com/ongoil/agnos-test/dto"
-	"github.com/ongoil/agnos-test/logger"
 	"github.com/ongoil/agnos-test/models"
 )
 
 func CreateStaff(c *gin.Context) {
 	var req RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		logger.LogError(c, "400 | Bad Request : Invalid request body -> ", err, logrus.Fields{"body": req})
-		c.JSON(http.StatusBadRequest, dto.Response{
-			Status:    "400",
-			Message:   "invalid request body",
-			MessageTh: "ข้อมูลไม่ถูกต้อง",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"message": "username, password (minimum 6 characters), and hospital are required"})
 		return
 	}
-
-	// Find hospital
+	if strings.TrimSpace(req.Hospital) == "" && req.HospitalID == uuid.Nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "hospital is required"})
+		return
+	}
 	var hospital models.Hospital
-	if err := db.DB.Where("id = ?", req.HospitalID).First(&hospital).Error; err != nil {
-		logger.LogError(c, "404 | Not Found : hospital not found -> ", err, logrus.Fields{"hospital_id": req.HospitalID})
-		c.JSON(http.StatusNotFound, dto.Response{
-			Status:    "404",
-			Message:   "hospital not found",
-			MessageTh: "ไม่พบข้อมูล",
-		})
+	query := db.DB
+	if req.HospitalID != uuid.Nil {
+		if err := query.First(&hospital, "id = ?", req.HospitalID).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"message": "hospital not found"})
+			return
+		} else if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"message": "failed to find hospital"})
+			return
+		}
+	} else if err := query.Where("name = ?", strings.TrimSpace(req.Hospital)).First(&hospital).Error; errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"message": "hospital not found"})
+		return
+	} else if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "failed to find hospital"})
 		return
 	}
-
-	// Check duplicate username
-	var existingStaff models.Staff
-	if err := db.DB.Where("username = ?", req.Username).First(&existingStaff).Error; err == nil {
-		logger.LogError(c, "409 | Conflict : username already exists -> ", err, logrus.Fields{"username": req.Username})
-		c.JSON(http.StatusConflict, dto.Response{
-			Status:    "409",
-			Message:   "username already exists",
-			MessageTh: "ชื่อผู้ใช้งานนี้ถูกใช้งานแล้ว",
-		})
+	var existing models.Staff
+	if err := query.Where("username = ?", strings.TrimSpace(req.Username)).First(&existing).Error; err == nil {
+		c.JSON(http.StatusConflict, gin.H{"message": "username already exists"})
+		return
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "failed to check username"})
 		return
 	}
-
-	// Hash password
-	passwordHash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		logger.LogError(c, "500 | Internal Server Error : failed to hash password -> ", err, logrus.Fields{"username": req.Username})
-		c.JSON(http.StatusInternalServerError, dto.Response{
-			Status:    "500",
-			Message:   "failed to hash password",
-			MessageTh: "ข้อผิดพลาดภายในเซิร์ฟเวอร์",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "failed to hash password"})
 		return
 	}
-
-	// Create staff
-	staff := models.Staff{
-		HospitalID:   hospital.Id,
-		Username:     req.Username,
-		PasswordHash: string(passwordHash),
-	}
-
-	if err := db.DB.Create(&staff).Error; err != nil {
-		logger.LogError(c, "500 | Internal Server Error : failed to create staff -> ", err, logrus.Fields{"username": req.Username})
-		c.JSON(http.StatusInternalServerError, dto.Response{
-			Status:    "500",
-			Message:   "failed to create staff",
-			MessageTh: "บันทึกข้อมูลไม่สำเร็จ",
-		})
+	staff := models.Staff{HospitalID: hospital.Id, Username: strings.TrimSpace(req.Username), PasswordHash: string(hash)}
+	if err := query.Create(&staff).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"message": "failed to create staff"})
 		return
 	}
-
-	c.JSON(http.StatusOK, dto.Response{
-		Status:    "200",
-		Message:   "Success",
-		MessageTh: "สำเร็จ",
-	})
-}
-
-func GetStaffData(c *gin.Context) {
-	var staff []models.Staff
-	if err := db.DB.Preload("Hospital").Find(&staff).Error; err != nil {
-		logger.LogError(c, "500 | Internal Server Error : failed to get staff -> ", err, logrus.Fields{})
-		c.JSON(http.StatusInternalServerError, dto.Response{
-			Status:    "500",
-			Message:   "failed to get staff",
-			MessageTh: "เกิดข้อผิดพลาดในการดึงข้อมูลเจ้าหน้าที่",
-		})
-		return
-	}
-
-	c.JSON(http.StatusOK, dto.Response{
-		Status:    "200",
-		Message:   "Success",
-		MessageTh: "สำเร็จ",
-		Data:      staff,
-	})
+	c.JSON(http.StatusCreated, gin.H{"data": CreateStaffResponse{ID: staff.Id, Username: staff.Username, HospitalID: staff.HospitalID}})
 }

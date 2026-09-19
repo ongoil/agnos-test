@@ -1,21 +1,46 @@
 services:
-  postgres:
-    image: postgres:16
-    container_name: agnos-test
+  api:
+    build: .
+    container_name: agnos-api
     restart: unless-stopped
     environment:
-      POSTGRES_DB: agnos-test
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: agnosdb
+      DB_PASSWORD: agnos1234
+      DB_NAME: agnos
+      DB_SSLMODE: disable
+      JWT_SECRET: change-this-in-production
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "5000"
+
+  postgres:
+    image: postgres:16
+    container_name: agnos-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: agnos
       POSTGRES_USER: agnosdb
       POSTGRES_PASSWORD: agnos1234
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agnosdb -d agnos"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   nginx:
     image: nginx:alpine
     container_name: agnos-nginx
     restart: unless-stopped
+    depends_on:
+      - api
     ports:
       - "80:80"
     volumes:
