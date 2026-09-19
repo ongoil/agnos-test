@@ -18,7 +18,10 @@ import (
 
 func TestLogin_WrongPassword(t *testing.T) {
 	sqlDB, mock, _ := sqlmock.New()
-	defer sqlDB.Close()
+	t.Cleanup(func() {
+		sqlDB.Close()
+		db.DB = nil
+	})
 
 	db.DB, _ = gorm.Open(postgres.New(postgres.Config{
 		Conn: sqlDB,
@@ -76,20 +79,58 @@ func TestCreateStaff_RequiresHospital(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
 
-func TestSearchPatient_InvalidDate(t *testing.T) {
+func TestSearchPatient_ByID(t *testing.T) {
+	sqlDB, mock, _ := sqlmock.New()
+	t.Cleanup(func() {
+		sqlDB.Close()
+		db.DB = nil
+	})
+
+	db.DB, _ = gorm.Open(postgres.New(postgres.Config{
+		Conn: sqlDB,
+	}), &gorm.Config{})
+
+	mock.ExpectQuery(`SELECT .* FROM "patients"`).
+		WithArgs("22222222-2222-2222-2222-222222222222").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id",
+			"hospital_id",
+			"patient_hn",
+		}).AddRow(
+			"11111111-1111-1111-1111-111111111111",
+			"22222222-2222-2222-2222-222222222222",
+			"HN001",
+		))
+
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.GET("/patient/search", func(c *gin.Context) {
+	router.GET("/patient/search/:id", func(c *gin.Context) {
 		c.Set("hospital_id", "22222222-2222-2222-2222-222222222222")
 		SearchPatient(c)
 	})
-	req := httptest.NewRequest(http.MethodGet, "/patient/search?date_of_birth=not-a-date", nil)
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/patient/search/11111111-1111-1111-1111-111111111111",
+		nil,
+	)
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
 func TestCreatePatient_InvalidGender(t *testing.T) {
+	sqlDB, mock, _ := sqlmock.New()
+	t.Cleanup(func() {
+		sqlDB.Close()
+		db.DB = nil
+	})
+
+	db.DB, _ = gorm.Open(postgres.New(postgres.Config{
+		Conn: sqlDB,
+	}), &gorm.Config{})
+	mock.ExpectBegin()
+
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.POST("/patient/create", func(c *gin.Context) {
