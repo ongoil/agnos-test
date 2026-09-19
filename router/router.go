@@ -19,7 +19,7 @@ func SetRouter(app *gin.Engine) {
 	// Protected v1 routes
 	v1Protected := v1.Group("/")
 	v1Protected.Use(middleware.Auth())
-	v1Protected.POST("/patient/create", handler.CreatePatient) // สรา้งข้อมูลข้อมูลผู้ป่วย patient
-	v1Protected.GET("/patient/search", handler.SearchPatient)  // ค้นหาข้อมูลผู้ป่วย patient
-
+	v1Protected.POST("/patient/create", handler.CreatePatient)    // สรา้งข้อมูลข้อมูลผู้ป่วย patient
+	v1Protected.GET("/patient/search", handler.GetPatient)        // ข้อมูลผู้ป่วย patient ทั้งหมด
+	v1Protected.GET("/patient/search/:id", handler.SearchPatient) // ค้นหาข้อมูลผู้ป่วย patient
 }

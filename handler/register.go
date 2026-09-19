@@ -170,8 +170,8 @@ func CreateStaff(c *gin.Context) {
 	}
 
 	// Response
-	c.JSON(http.StatusCreated, dto.Response{
-		Status:    "201",
+	c.JSON(http.StatusOK, dto.Response{
+		Status:    "200",
 		Message:   "staff created successfully",
 		MessageTh: "สร้างเจ้าหน้าที่สำเร็จ",
 		Data: CreateStaffResponse{

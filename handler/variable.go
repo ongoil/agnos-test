@@ -29,7 +29,6 @@ type LoginStaffResponse struct {
 }
 
 type CreatePatientRequest struct {
-	PatientHN    string `json:"patient_hn" binding:"required"`
 	NationalID   string `json:"national_id"`
 	PassportID   string `json:"passport_id"`
 	FirstNameTH  string `json:"first_name_th"`
