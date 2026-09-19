@@ -57,5 +57,6 @@ func CreateHospital(c *gin.Context) {
 		Status:    "200",
 		Message:   "Success",
 		MessageTh: "สำเร็จ",
+		Data:      newHospital,
 	})
 }

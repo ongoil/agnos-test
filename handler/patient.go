@@ -7,94 +7,167 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/sirupsen/logrus"
 
 	"github.com/ongoil/agnos-test/db"
+	"github.com/ongoil/agnos-test/dto"
+	"github.com/ongoil/agnos-test/logger"
 	"github.com/ongoil/agnos-test/models"
 )
 
 func CreatePatient(c *gin.Context) {
-	hospitalID, err := uuid.Parse(c.GetString("hospital_id"))
-	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"message": "invalid hospital context"})
-		return
-	}
 	var req CreatePatientRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "patient_hn is required and request body is invalid"})
+		logger.LogError(c, "400 | Bad Request : Invalid request body -> ", err, logrus.Fields{"body": req})
+		c.JSON(http.StatusBadRequest, dto.Response{
+			Status:    "400",
+			Message:   "patient_hn is required and request body is invalid",
+			MessageTh: "กรุณาระบุ Patient HN และข้อมูลต้องถูกต้อง",
+		})
 		return
 	}
+
+	tx := db.DB.Begin()
+
+	patientHN := strings.TrimSpace(req.PatientHN)
+	// Validate patient HN
+	if patientHN == "" {
+		c.JSON(http.StatusBadRequest, dto.Response{
+			Status:    "400",
+			Message:   "patient_hn is required",
+			MessageTh: "กรุณาระบุ Patient HN",
+		})
+		return
+	}
+
+	// Validate gender
 	gender := strings.ToUpper(strings.TrimSpace(req.Gender))
 	if gender != "" && gender != "M" && gender != "F" {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "gender must be M or F"})
+		c.JSON(http.StatusBadRequest, dto.Response{
+			Status:    "400",
+			Message:   "gender must be M or F",
+			MessageTh: "Gender ต้องเป็น M หรือ F เท่านั้น",
+		})
 		return
 	}
+
+	// Validate date of birth
 	var dateOfBirth *time.Time
-	if req.DateOfBirth != "" {
-		parsed, parseErr := time.Parse("2006-01-02", req.DateOfBirth)
+	if strings.TrimSpace(req.DateOfBirth) != "" {
+		parsed, parseErr := time.Parse("2006-01-02", strings.TrimSpace(req.DateOfBirth))
 		if parseErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"message": "date_of_birth must use YYYY-MM-DD"})
+			c.JSON(http.StatusBadRequest, dto.Response{
+				Status:    "400",
+				Message:   "date_of_birth must use YYYY-MM-DD",
+				MessageTh: "วันเกิดต้องอยู่ในรูปแบบ YYYY-MM-DD",
+			})
 			return
 		}
 		dateOfBirth = &parsed
 	}
-	patient := models.Patient{
-		HospitalID: hospitalID, PatientHN: strings.TrimSpace(req.PatientHN),
-		NationalID: req.NationalID, PassportID: req.PassportID,
-		FirstNameTH: req.FirstNameTH, MiddleNameTH: req.MiddleNameTH, LastNameTH: req.LastNameTH,
-		FirstNameEN: req.FirstNameEN, MiddleNameEN: req.MiddleNameEN, LastNameEN: req.LastNameEN,
-		DateOfBirth: dateOfBirth, PhoneNumber: req.PhoneNumber, Email: req.Email, Gender: gender,
-	}
-	if err := db.DB.Create(&patient).Error; err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "duplicate") {
-			c.JSON(http.StatusConflict, gin.H{"message": "patient_hn already exists in this hospital"})
-			return
-		}
-		c.JSON(http.StatusInternalServerError, gin.H{"message": "failed to create patient"})
+
+	// ดึง hospital_id จาก session
+	hospitalID, err := uuid.Parse(c.GetString("hospital_id"))
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, dto.Response{
+			Status:    "401",
+			Message:   "invalid hospital context",
+			MessageTh: "ข้อมูลโรงพยาบาลใน Token ไม่ถูกต้อง",
+		})
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"data": patient})
+
+	// Create patient
+	patient := models.Patient{
+		HospitalID:   hospitalID,
+		PatientHN:    patientHN,
+		NationalID:   strings.TrimSpace(req.NationalID),
+		PassportID:   strings.TrimSpace(req.PassportID),
+		FirstNameTH:  strings.TrimSpace(req.FirstNameTH),
+		MiddleNameTH: strings.TrimSpace(req.MiddleNameTH),
+		LastNameTH:   strings.TrimSpace(req.LastNameTH),
+		FirstNameEN:  strings.TrimSpace(req.FirstNameEN),
+		MiddleNameEN: strings.TrimSpace(req.MiddleNameEN),
+		LastNameEN:   strings.TrimSpace(req.LastNameEN),
+		DateOfBirth:  dateOfBirth,
+		PhoneNumber:  strings.TrimSpace(req.PhoneNumber),
+		Email:        strings.TrimSpace(req.Email),
+		Gender:       gender,
+	}
+
+	if err := tx.Create(&patient).Error; err != nil {
+		tx.Rollback()
+		if strings.Contains(strings.ToLower(err.Error()), "duplicate") {
+			c.JSON(http.StatusConflict, dto.Response{
+				Status:    "409",
+				Message:   "patient_hn already exists in this hospital",
+				MessageTh: "Patient HN นี้มีอยู่แล้วในโรงพยาบาลนี้",
+			})
+			return
+		}
+		logger.LogError(c, "500 | Internal Server Error : failed to create patient -> ", err, logrus.Fields{"hospital_id": hospitalID, "patient_hn": patientHN})
+		c.JSON(http.StatusInternalServerError, dto.Response{
+			Status:    "500",
+			Message:   "failed to create patient",
+			MessageTh: "ไม่สามารถสร้างข้อมูลผู้ป่วยได้",
+		})
+		return
+	}
+
+	// Commit transaction
+	if err := tx.Commit().Error; err != nil {
+		logger.LogError(c, "500 | Internal Server Error : ailed to commit transaction  -> ", err, logrus.Fields{"hospital_id": hospitalID, "patient_hn": patientHN})
+		c.JSON(http.StatusInternalServerError, dto.Response{
+			Status:    "500",
+			Message:   "Internal Server Error - POST transactions",
+			MessageTh: "ข้อผิดพลาดภายในเซิร์ฟเวอร์",
+			Error:     err.Error(),
+		})
+		return
+	}
+
+	c.JSON(http.StatusCreated, dto.Response{
+		Status:    "201",
+		Message:   "patient created successfully",
+		MessageTh: "สร้างข้อมูลผู้ป่วยสำเร็จ",
+		Data:      patient,
+	})
 }
 
 func SearchPatient(c *gin.Context) {
+	search := c.Query("search")
+
 	hospitalID, err := uuid.Parse(c.GetString("hospital_id"))
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"message": "invalid hospital context"})
 		return
 	}
-	var req PatientSearchRequest
-	if err := c.ShouldBindQuery(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"message": "invalid search parameters"})
-		return
-	}
+
 	query := db.DB.Where("hospital_id = ?", hospitalID)
-	if req.NationalID != "" {
-		query = query.Where("national_id = ?", req.NationalID)
-	}
-	if req.PassportID != "" {
-		query = query.Where("passport_id = ?", req.PassportID)
-	}
-	if req.FirstName != "" {
-		query = query.Where("(first_name_th ILIKE ? OR first_name_en ILIKE ?)", "%"+req.FirstName+"%", "%"+req.FirstName+"%")
-	}
-	if req.MiddleName != "" {
-		query = query.Where("(middle_name_th ILIKE ? OR middle_name_en ILIKE ?)", "%"+req.MiddleName+"%", "%"+req.MiddleName+"%")
-	}
-	if req.LastName != "" {
-		query = query.Where("(last_name_th ILIKE ? OR last_name_en ILIKE ?)", "%"+req.LastName+"%", "%"+req.LastName+"%")
-	}
-	if req.PhoneNumber != "" {
-		query = query.Where("phone_number = ?", req.PhoneNumber)
-	}
-	if req.Email != "" {
-		query = query.Where("email ILIKE ?", req.Email)
-	}
-	if req.DateOfBirth != "" {
-		date, parseErr := time.Parse("2006-01-02", req.DateOfBirth)
-		if parseErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"message": "date_of_birth must use YYYY-MM-DD"})
-			return
-		}
-		query = query.Where("date_of_birth = ?", date)
+	if search != "" {
+		searchWithoutSpaces := strings.ReplaceAll(search, " ", "")
+
+		query = query.Where(`
+		STRPOS(
+			REPLACE(
+				CONCAT_WS(
+					'|',
+					patient_hn,
+					national_id,
+					passport_id,
+					first_name_th,
+					middle_name_th,
+					last_name_th,
+					first_name_en,
+					middle_name_en,
+					last_name_en
+				),
+				' ',
+				''
+			),
+			?
+		) > 0
+	`, searchWithoutSpaces)
 	}
 	var patients []models.Patient
 	if err := query.Order("last_name_en, last_name_th, first_name_en, first_name_th").Find(&patients).Error; err != nil {
