@@ -91,7 +91,10 @@ func TestSearchPatient_ByID(t *testing.T) {
 	}), &gorm.Config{})
 
 	mock.ExpectQuery(`SELECT .* FROM "patients"`).
-		WithArgs("22222222-2222-2222-2222-222222222222").
+		WithArgs(
+			"22222222-2222-2222-2222-222222222222",
+			"11111111-1111-1111-1111-111111111111",
+		).
 		WillReturnRows(sqlmock.NewRows([]string{
 			"id",
 			"hospital_id",
