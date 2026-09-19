@@ -88,3 +88,18 @@ func TestSearchPatient_InvalidDate(t *testing.T) {
 	router.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }
+
+func TestCreatePatient_InvalidGender(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.POST("/patient/create", func(c *gin.Context) {
+		c.Set("hospital_id", "22222222-2222-2222-2222-222222222222")
+		CreatePatient(c)
+	})
+	req := httptest.NewRequest(http.MethodPost, "/patient/create",
+		strings.NewReader(`{"patient_hn":"HN001","gender":"X"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}

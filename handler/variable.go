@@ -40,3 +40,19 @@ type PatientSearchRequest struct {
 	PhoneNumber string `form:"phone_number"`
 	Email       string `form:"email"`
 }
+
+type CreatePatientRequest struct {
+	PatientHN    string `json:"patient_hn" binding:"required"`
+	NationalID   string `json:"national_id"`
+	PassportID   string `json:"passport_id"`
+	FirstNameTH  string `json:"first_name_th"`
+	MiddleNameTH string `json:"middle_name_th"`
+	LastNameTH   string `json:"last_name_th"`
+	FirstNameEN  string `json:"first_name_en"`
+	MiddleNameEN string `json:"middle_name_en"`
+	LastNameEN   string `json:"last_name_en"`
+	DateOfBirth  string `json:"date_of_birth"`
+	PhoneNumber  string `json:"phone_number"`
+	Email        string `json:"email"`
+	Gender       string `json:"gender"`
+}
