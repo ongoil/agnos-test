@@ -12,7 +12,7 @@ import (
 
 // Model struct
 type Model struct {
-	Id        uuid.UUID      `json:"id" gorm:"type:char(36);primaryKey;not null"`
+	Id        uuid.UUID      `json:"id" gorm:"type:uuid;primaryKey;not null"`
 	Seq       int64          `json:"seq" gorm:"index"`
 	CreatedAt time.Time      `json:"created_at" gorm:"autoCreateTime:nano"`
 	UpdatedAt time.Time      `json:"updated_at" gorm:"autoUpdateTime:nano"`

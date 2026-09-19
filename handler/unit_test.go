@@ -10,20 +10,11 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/gin-gonic/gin"
 	"github.com/ongoil/agnos-test/db"
-	"github.com/ongoil/agnos-test/models"
 	"github.com/stretchr/testify/assert"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
-
-func GetStaff() ([]models.Staff, error) {
-	var staff []models.Staff
-
-	err := db.DB.Find(&staff).Error
-
-	return staff, err
-}
 
 func TestLogin_WrongPassword(t *testing.T) {
 	sqlDB, mock, _ := sqlmock.New()
@@ -71,4 +62,29 @@ func TestLogin_WrongPassword(t *testing.T) {
 	router.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+func TestCreateStaff_RequiresHospital(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.POST("/staff/create", CreateStaff)
+	req := httptest.NewRequest(http.MethodPost, "/staff/create",
+		strings.NewReader(`{"username":"alice","password":"secret123"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
+}
+
+func TestSearchPatient_InvalidDate(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/patient/search", func(c *gin.Context) {
+		c.Set("hospital_id", "22222222-2222-2222-2222-222222222222")
+		SearchPatient(c)
+	})
+	req := httptest.NewRequest(http.MethodGet, "/patient/search?date_of_birth=not-a-date", nil)
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusBadRequest, rec.Code)
 }

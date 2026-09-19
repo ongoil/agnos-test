@@ -1,37 +1,24 @@
 package middleware
 
 import (
+	"os"
 	"time"
 
-	"testing"
-
 	"github.com/golang-jwt/jwt/v5"
-	uuid "github.com/google/uuid"
+	"github.com/google/uuid"
 )
 
-func TestAdd(t *testing.T) {
-	result := Add(2, 3)
-
-	if result != 5 {
-		t.Errorf("expected 5, got %d", result)
+var jwtSecret = []byte(func() string {
+	if value := os.Getenv("JWT_SECRET"); value != "" {
+		return value
 	}
-}
-
-func Add(a int, b int) int {
-	return a + b
-}
-
-var jwtSecret = []byte("your-secret-key")
+	return "development-only-change-me"
+}())
 
 func GenerateToken(staffID uuid.UUID, hospitalID uuid.UUID) (string, error) {
 	claims := jwt.MapClaims{
-		"staff_id":    staffID.String(),
-		"hospital_id": hospitalID.String(),
-		"exp":         time.Now().Add(24 * time.Hour).Unix(),
-		"iat":         time.Now().Unix(),
+		"staff_id": staffID.String(), "hospital_id": hospitalID.String(),
+		"exp": time.Now().Add(24 * time.Hour).Unix(), "iat": time.Now().Unix(),
 	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	return token.SignedString(jwtSecret)
+	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(jwtSecret)
 }

@@ -60,7 +60,21 @@ func Auth() gin.HandlerFunc {
 			return
 		}
 
-		// Token is valid
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			c.JSON(http.StatusUnauthorized, gin.H{"status": "401", "message": "invalid token claims"})
+			c.Abort()
+			return
+		}
+		staffID, staffOK := claims["staff_id"].(string)
+		hospitalID, hospitalOK := claims["hospital_id"].(string)
+		if !staffOK || !hospitalOK || staffID == "" || hospitalID == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"status": "401", "message": "invalid token claims"})
+			c.Abort()
+			return
+		}
+		c.Set("staff_id", staffID)
+		c.Set("hospital_id", hospitalID)
 		c.Set("token", token)
 
 		c.Next()
